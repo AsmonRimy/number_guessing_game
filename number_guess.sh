@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Connect to the database
 PSQL="psql --username=freecodecamp --dbname=number_guess -t --no-align -c"
 
 # Function to get user data
@@ -19,9 +20,11 @@ USER_DATA=$(get_user_data "$USERNAME")
 if [[ -z $USER_DATA ]]; then
   # If the user is new, insert them into the database
   echo "Welcome, $USERNAME! It looks like this is your first time here."
-  $PSQL "INSERT INTO users(username) VALUES('$USERNAME');"
+  # Initialize games_played and best_game
   GAMES_PLAYED=0
   BEST_GAME=0
+  # Insert new user into the database
+  $PSQL "INSERT INTO users(username, games_played, best_game) VALUES('$USERNAME', $GAMES_PLAYED, $BEST_GAME);"
 else
   # If the user exists, retrieve their games_played and best_game
   GAMES_PLAYED=$(echo "$USER_DATA" | cut -d '|' -f1)
@@ -42,13 +45,7 @@ NUMBER_OF_GUESSES=0
 while true; do
   read GUESS
 
-  # Check if the user wants to exit
-  if [[ $GUESS == "exit" ]]; then
-    echo "You have exited the game. The secret number was $SECRET_NUMBER."
-    break
-  fi
-
-  # Check if input is an integer
+  # Check if the input is an integer
   if ! [[ $GUESS =~ ^[0-9]+$ ]]; then
     echo "That is not an integer, guess again:"
     continue
@@ -64,6 +61,15 @@ while true; do
     echo "It's lower than that, guess again:"
   else
     echo "You guessed it in $NUMBER_OF_GUESSES tries. The secret number was $SECRET_NUMBER. Nice job!"
+    # Update the user's game data in the database
+    # Increment the games played
+    GAMES_PLAYED=$((GAMES_PLAYED + 1))
+    # Check if the current game is the best game
+    if [[ $BEST_GAME -eq 0 || $NUMBER_OF_GUESSES -lt $BEST_GAME ]]; then
+      BEST_GAME=$NUMBER_OF_GUESSES
+    fi
+    # Update the database with new stats
+    $PSQL "UPDATE users SET games_played=$GAMES_PLAYED, best_game=$BEST_GAME WHERE username='$USERNAME';"
     break
   fi
 done
